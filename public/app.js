@@ -34,6 +34,7 @@ async function sendResponse(id,btn){
   if(answered.has(id))return;
   const price=document.querySelector(`input[name="price-${id}"]:checked`);
   if(!price){showPriceRequiredPopup(id);return;}
+  closePriceRequiredPopup();
   const uses=[...document.querySelectorAll(`input[name="use-${id}"]:checked`)].map(x=>x.value);const interest=$(`#interest-${id}`).value;const other=$(`#other-${id}`).value.trim();
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:price.value,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
@@ -115,16 +116,21 @@ async function loadStats(){
   +(ss.map(s=>{
     const withChoice=s.prices.filter(x=>x.price_choice!=null);
     const priceRespCount=withChoice.reduce((a,x)=>a+x.c,0);
-    const avg=priceRespCount?(withChoice.reduce((a,x)=>a+x.price_choice*x.c,0)/priceRespCount).toFixed(2):null;
+    const avgPrice=priceRespCount?(withChoice.reduce((a,x)=>a+x.price_choice*x.c,0)/priceRespCount).toFixed(2):null;
     const maxPrice=Math.max(...s.prices.map(x=>x.c),1);
     const sortedPrices=[...s.prices].sort((a,b)=>b.c-a.c);
     const usesTotal=s.uses.reduce((a,x)=>a+x.c,0);
     const maxUse=Math.max(...s.uses.map(x=>x.c),1);
     const sortedUses=[...s.uses].sort((a,b)=>b.c-a.c);
     const noPriceCount=s.responses-priceRespCount;
+    const interestAvg=s.interest?.avg;
+    const interestBadge=interestAvg!=null?`<span class="interest-badge${interestAvg>=4?' good':interestAvg<2.5?' bad':''}">★ ${interestAvg}/5</span>`:'';
+    const maxDist=Math.max(...(s.interest?.distribution||[]).map(x=>x.c),1);
     return `<div class="statsbox">
-      <h3>${esc(s.product.name)}</h3>
-      <p><strong>${s.responses}</strong> réponse${s.responses>1?'s':''}${avg?` · prix moyen proposé : <strong>${avg} €</strong>`:''}</p>
+      <h3>${esc(s.product.name)} ${interestBadge}</h3>
+      <p><strong>${s.responses}</strong> réponse${s.responses>1?'s':''}${avgPrice?` · prix moyen proposé : <strong>${avgPrice} €</strong>`:''}</p>
+      ${(s.interest?.distribution?.length)?`<p><strong>Intérêt</strong> <small>(${s.interest.count} note${s.interest.count>1?'s':''})</small></p>
+      ${s.interest.distribution.slice().reverse().map(x=>`<div class="stat-row"><span>${x.score}/5</span><span>${x.c} · ${Math.round(x.c/Math.max(s.interest.count,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxDist*100)}%"></i></div>`).join('')}`:''}
       <p><strong>Prix proposés</strong>${noPriceCount>0?` <small>(${noPriceCount} sans choix)</small>`:''}</p>
       ${sortedPrices.length?sortedPrices.map(x=>`<div class="stat-row"><span>${x.price_choice==null?'Non choisi':x.price_choice+' €'}</span><span>${x.c} · ${Math.round(x.c/Math.max(s.responses,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxPrice*100)}%"></i></div>`).join(''):'<p>Aucun prix sélectionné.</p>'}
       <p><strong>Utilisations</strong></p>
