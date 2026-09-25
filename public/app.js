@@ -1,16 +1,42 @@
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 let productCount=0, answered=new Set();
+const VOTED_KEY='ef3d_voted';
+function getVotedIds(){try{return JSON.parse(localStorage.getItem(VOTED_KEY)||'[]')}catch(e){return []}}
+function markVoted(id){try{const v=new Set(getVotedIds());v.add(id);localStorage.setItem(VOTED_KEY,JSON.stringify([...v]))}catch(e){}}
+function toast(msg){
+  const existing=$('#toast');if(existing)existing.remove();
+  const el=document.createElement('div');el.id='toast';el.className='toast';el.textContent=msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300)},2200);
+}
+function shareProduct(id){
+  const url=location.origin+location.pathname+'#product-'+id;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>toast('Lien copié !')).catch(()=>prompt('Copiez ce lien :',url));
+  }else{
+    prompt('Copiez ce lien :',url);
+  }
+}
 
 async function loadProducts(){
   try{const r=await fetch('/api/products');if(!r.ok)throw new Error();const ps=await r.json();productCount=ps.length;$('#loading').classList.add('hidden');$('#progressText').textContent=ps.length?`${ps.length} création${ps.length>1?'s':''} à découvrir`:'Collection en préparation';
     if(!ps.length){$('#products').innerHTML='<div class="thanks"><h2>La forge prépare ses premières créations…</h2><p>Revenez bientôt pour participer à la collection.</p></div>';return}
     $('#products').innerHTML=ps.map((p,i)=>card(p,i)).join('');
+    const votedIds=new Set(getVotedIds());
+    answered=new Set(ps.filter(p=>votedIds.has(p.id)).map(p=>p.id));
+    answered.forEach(id=>{
+      const btn=document.querySelector(`#product-${id} .submit`);
+      if(btn){btn.disabled=true;btn.textContent='✓ Réponse enregistrée';}
+    });
+    updateProgress();
+    if(location.hash){const target=document.querySelector(location.hash);if(target)setTimeout(()=>target.scrollIntoView({behavior:'smooth',block:'start'}),100);}
   }catch(e){$('#loading').innerHTML='Impossible de charger la collection. Réessayez dans quelques instants.';}
 }
 function card(p,i){
   const prices=[p.price1,p.price2,p.price3,p.price4].filter(x=>x!=null);
-  return `<article class="card" id="product-${p.id}"><div class="card-grid"><div class="image-wrap"><img class="product-img" src="${esc(p.image||'/assets/logo.png')}" alt="${esc(p.name)}"></div><div class="content"><span class="tag">${esc(p.category||'Création')}</span><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div></div><div class="question">À quel prix pourriez-vous envisager cet objet ? <span class="required">*</span></div><div class="choices" id="choices-${p.id}">${prices.map(x=>`<label><input type="radio" name="price-${p.id}" value="${x}"><span>${x} €</span></label>`).join('')}</div><div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
+  return `<article class="card" id="product-${p.id}"><div class="card-grid"><div class="image-wrap"><img class="product-img" src="${esc(p.image||'/assets/logo.png')}" alt="${esc(p.name)}"></div><div class="content"><div class="content-head"><span class="tag">${esc(p.category||'Création')}</span><button type="button" class="share-btn" onclick="shareProduct(${p.id})">🔗 Partager</button></div><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div></div><div class="question">À quel prix pourriez-vous envisager cet objet ? <span class="required">*</span></div><div class="choices" id="choices-${p.id}">${prices.map(x=>`<label><input type="radio" name="price-${p.id}" value="${x}"><span>${x} €</span></label>`).join('')}</div><div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
 }
 function showPriceRequiredPopup(productId){
   const existing=$('#priceRequiredModal');
@@ -37,7 +63,7 @@ async function sendResponse(id,btn){
   closePriceRequiredPopup();
   const uses=[...document.querySelectorAll(`input[name="use-${id}"]:checked`)].map(x=>x.value);const interest=$(`#interest-${id}`).value;const other=$(`#other-${id}`).value.trim();
   btn.disabled=true;btn.textContent='Enregistrement…';
-  try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:price.value,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
+  try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:price.value,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);markVoted(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
   catch(e){btn.disabled=false;btn.textContent='Réessayer';alert('Votre réponse n’a pas pu être enregistrée.');}
 }
 function updateProgress(){const n=answered.size;$('#progressText').textContent=`${n}/${productCount} création${productCount>1?'s':''} évaluée${productCount>1?'s':''}`}
@@ -112,7 +138,7 @@ async function deleteProduct(id){if(!confirm('Supprimer cette fiche et conserver
 async function loadStats(){
   const r=await fetch('/api/admin/stats');if(!r.ok)return;const ss=await r.json();
   const total=ss.reduce((a,s)=>a+s.responses,0);
-  $('#stats').innerHTML=`<div class="mini-grid"><div class="mini"><b>${ss.length}</b><span>créations</span></div><div class="mini"><b>${total}</b><span>réponses</span></div><div class="mini"><b>${ss.filter(s=>s.responses>0).length}</b><span>créations évaluées</span></div></div>`
+  $('#stats').innerHTML=`<a class="gold-button" style="width:auto;display:inline-block;text-decoration:none;margin:0 0 14px" href="/api/admin/export.csv">⬇ Exporter en CSV</a><div class="mini-grid"><div class="mini"><b>${ss.length}</b><span>créations</span></div><div class="mini"><b>${total}</b><span>réponses</span></div><div class="mini"><b>${ss.filter(s=>s.responses>0).length}</b><span>créations évaluées</span></div></div>`
   +(ss.map(s=>{
     const withChoice=s.prices.filter(x=>x.price_choice!=null);
     const priceRespCount=withChoice.reduce((a,x)=>a+x.c,0);
@@ -135,6 +161,7 @@ async function loadStats(){
       ${sortedPrices.length?sortedPrices.map(x=>`<div class="stat-row"><span>${x.price_choice==null?'Non choisi':x.price_choice+' €'}</span><span>${x.c} · ${Math.round(x.c/Math.max(s.responses,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxPrice*100)}%"></i></div>`).join(''):'<p>Aucun prix sélectionné.</p>'}
       <p><strong>Utilisations</strong></p>
       ${sortedUses.length?sortedUses.map(x=>`<div class="stat-row"><span>${esc(x.uses||'Non renseigné')}</span><span>${x.c} · ${Math.round(x.c/Math.max(usesTotal,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxUse*100)}%"></i></div>`).join(''):'<p>Aucune donnée.</p>'}
+      ${(s.comments&&s.comments.length)?`<p><strong>Commentaires libres</strong> <small>(${s.comments.length})</small></p><div class="comments">${s.comments.map(c=>`<div class="comment">“${esc(c)}”</div>`).join('')}</div>`:''}
     </div>`;
   }).join(''))||'<p>Aucune réponse.</p>';
 }
