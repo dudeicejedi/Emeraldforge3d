@@ -10,13 +10,33 @@ async function loadProducts(){
 }
 function card(p,i){
   const prices=[p.price1,p.price2,p.price3,p.price4].filter(x=>x!=null);
-  return `<article class="card" id="product-${p.id}"><div class="card-grid"><div class="image-wrap"><img class="product-img" src="${esc(p.image||'/assets/logo.png')}" alt="${esc(p.name)}"></div><div class="content"><span class="tag">${esc(p.category||'Création')}</span><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div></div><div class="question">À quel prix pourriez-vous envisager cet objet ?</div><div class="choices">${prices.map(x=>`<label><input type="radio" name="price-${p.id}" value="${x}"><span>${x} €</span></label>`).join('')}</div><div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
+  return `<article class="card" id="product-${p.id}"><div class="card-grid"><div class="image-wrap"><img class="product-img" src="${esc(p.image||'/assets/logo.png')}" alt="${esc(p.name)}"></div><div class="content"><span class="tag">${esc(p.category||'Création')}</span><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div></div><div class="question">À quel prix pourriez-vous envisager cet objet ? <span class="required">*</span></div><div class="choices" id="choices-${p.id}">${prices.map(x=>`<label><input type="radio" name="price-${p.id}" value="${x}"><span>${x} €</span></label>`).join('')}</div><div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
+}
+function showPriceRequiredPopup(productId){
+  const existing=$('#priceRequiredModal');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='priceRequiredModal';
+  modal.className='popup-overlay';
+  modal.innerHTML=`<div class="popup-box"><h3>Prix manquant</h3><p>Merci de sélectionner un prix avant de valider votre avis. Cette information est indispensable pour nous aider à fixer un tarif juste.</p><button class="gold-button" style="width:auto" onclick="closePriceRequiredPopup()">Compris</button></div>`;
+  document.body.appendChild(modal);
+  document.body.style.overflow='hidden';
+  const choicesEl=$(`#choices-${productId}`);
+  if(choicesEl)choicesEl.classList.add('shake-error');
+  setTimeout(()=>{if(choicesEl)choicesEl.classList.remove('shake-error')},600);
+}
+function closePriceRequiredPopup(){
+  const modal=$('#priceRequiredModal');
+  if(modal)modal.remove();
+  document.body.style.overflow='';
 }
 async function sendResponse(id,btn){
   if(answered.has(id))return;
-  const price=document.querySelector(`input[name="price-${id}"]:checked`);const uses=[...document.querySelectorAll(`input[name="use-${id}"]:checked`)].map(x=>x.value);const interest=$(`#interest-${id}`).value;const other=$(`#other-${id}`).value.trim();
+  const price=document.querySelector(`input[name="price-${id}"]:checked`);
+  if(!price){showPriceRequiredPopup(id);return;}
+  const uses=[...document.querySelectorAll(`input[name="use-${id}"]:checked`)].map(x=>x.value);const interest=$(`#interest-${id}`).value;const other=$(`#other-${id}`).value.trim();
   btn.disabled=true;btn.textContent='Enregistrement…';
-  try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:price?.value||null,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
+  try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:price.value,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
   catch(e){btn.disabled=false;btn.textContent='Réessayer';alert('Votre réponse n’a pas pu être enregistrée.');}
 }
 function updateProgress(){const n=answered.size;$('#progressText').textContent=`${n}/${productCount} création${productCount>1?'s':''} évaluée${productCount>1?'s':''}`}
@@ -88,5 +108,28 @@ async function saveForm(id){
   loadAdmin();
 }
 async function deleteProduct(id){if(!confirm('Supprimer cette fiche et conserver ses réponses ?'))return;const r=await fetch('/api/admin/products/'+id,{method:'DELETE'});if(r.ok)loadAdmin();else alert('Suppression impossible.')}
-async function loadStats(){const r=await fetch('/api/admin/stats');if(!r.ok)return;const ss=await r.json();let total=ss.reduce((a,s)=>a+s.responses,0);$('#stats').innerHTML=`<div class="mini-grid"><div class="mini"><b>${ss.length}</b><span>créations</span></div><div class="mini"><b>${total}</b><span>réponses</span></div><div class="mini"><b>${ss.filter(s=>s.responses>0).length}</b><span>créations évaluées</span></div></div>`+(ss.map(s=>{const max=Math.max(...s.prices.map(x=>x.c),1);return `<div class="statsbox"><h3>${esc(s.product.name)}</h3><p><strong>${s.responses}</strong> réponses</p><p><strong>Prix proposés</strong></p>${s.prices.map(x=>`<div>${x.price_choice==null?'Non choisi':x.price_choice+' €'} — ${x.c} (${Math.round(x.c/Math.max(s.responses,1)*100)}%)</div><div class="statline"><i style="width:${Math.round(x.c/max*100)}%"></i></div>`).join('')||'<p>Aucun prix sélectionné.</p>'}<p><strong>Utilisations</strong></p>${s.uses.map(x=>`<div>${esc(x.uses||'Non renseigné')} — ${x.c}</div>`).join('')||'<p>Aucune donnée.</p>'}</div>`}).join(''))||'<p>Aucune réponse.</p>'}
+async function loadStats(){
+  const r=await fetch('/api/admin/stats');if(!r.ok)return;const ss=await r.json();
+  const total=ss.reduce((a,s)=>a+s.responses,0);
+  $('#stats').innerHTML=`<div class="mini-grid"><div class="mini"><b>${ss.length}</b><span>créations</span></div><div class="mini"><b>${total}</b><span>réponses</span></div><div class="mini"><b>${ss.filter(s=>s.responses>0).length}</b><span>créations évaluées</span></div></div>`
+  +(ss.map(s=>{
+    const withChoice=s.prices.filter(x=>x.price_choice!=null);
+    const priceRespCount=withChoice.reduce((a,x)=>a+x.c,0);
+    const avg=priceRespCount?(withChoice.reduce((a,x)=>a+x.price_choice*x.c,0)/priceRespCount).toFixed(2):null;
+    const maxPrice=Math.max(...s.prices.map(x=>x.c),1);
+    const sortedPrices=[...s.prices].sort((a,b)=>b.c-a.c);
+    const usesTotal=s.uses.reduce((a,x)=>a+x.c,0);
+    const maxUse=Math.max(...s.uses.map(x=>x.c),1);
+    const sortedUses=[...s.uses].sort((a,b)=>b.c-a.c);
+    const noPriceCount=s.responses-priceRespCount;
+    return `<div class="statsbox">
+      <h3>${esc(s.product.name)}</h3>
+      <p><strong>${s.responses}</strong> réponse${s.responses>1?'s':''}${avg?` · prix moyen proposé : <strong>${avg} €</strong>`:''}</p>
+      <p><strong>Prix proposés</strong>${noPriceCount>0?` <small>(${noPriceCount} sans choix)</small>`:''}</p>
+      ${sortedPrices.length?sortedPrices.map(x=>`<div class="stat-row"><span>${x.price_choice==null?'Non choisi':x.price_choice+' €'}</span><span>${x.c} · ${Math.round(x.c/Math.max(s.responses,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxPrice*100)}%"></i></div>`).join(''):'<p>Aucun prix sélectionné.</p>'}
+      <p><strong>Utilisations</strong></p>
+      ${sortedUses.length?sortedUses.map(x=>`<div class="stat-row"><span>${esc(x.uses||'Non renseigné')}</span><span>${x.c} · ${Math.round(x.c/Math.max(usesTotal,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxUse*100)}%"></i></div>`).join(''):'<p>Aucune donnée.</p>'}
+    </div>`;
+  }).join(''))||'<p>Aucune réponse.</p>';
+}
 loadProducts();
