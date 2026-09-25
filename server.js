@@ -168,10 +168,16 @@ app.post('/api/responses', async (req, res) => {
       .maybeSingle();
 
     if (productError) {
-      console.error(productError);
-      return res.status(500).json({
-        error: 'Erreur serveur'
-      });
+      } catch (error) {
+  console.error('ERREUR CREATION PRODUIT:', error);
+
+  res.status(500).json({
+    error: error?.message || String(error),
+    code: error?.code || null,
+    details: error?.details || null,
+    hint: error?.hint || null
+  });
+}
     }
 
     if (!product) {
