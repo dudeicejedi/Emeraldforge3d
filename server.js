@@ -168,13 +168,10 @@ app.post('/api/responses', async (req, res) => {
       .maybeSingle();
 
     if (productError) {
-      } catch (error) {
-  console.error(error);
-  res.status(500).json({
-    error: 'Erreur serveur'
-  });
-}
-}
+      console.error(productError);
+      return res.status(500).json({
+        error: 'Erreur serveur'
+      });
     }
 
     if (!product) {
@@ -311,16 +308,16 @@ app.post(
         .select('id')
         .single();
 
-     if (error) {
-  console.error('ERREUR SUPABASE INSERT PRODUCT:', error);
+      if (error) {
+        console.error('ERREUR SUPABASE INSERT PRODUCT:', error);
 
-  return res.status(500).json({
-    error: error.message,
-    code: error.code,
-    details: error.details,
-    hint: error.hint
-  });
-}
+        return res.status(500).json({
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+      }
 
       res.json({
         id: data.id
