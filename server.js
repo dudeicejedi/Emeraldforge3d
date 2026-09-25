@@ -169,14 +169,11 @@ app.post('/api/responses', async (req, res) => {
 
     if (productError) {
       } catch (error) {
-  console.error('ERREUR CREATION PRODUIT:', error);
-
+  console.error(error);
   res.status(500).json({
-    error: error?.message || String(error),
-    code: error?.code || null,
-    details: error?.details || null,
-    hint: error?.hint || null
+    error: 'Erreur serveur'
   });
+}
 }
     }
 
