@@ -308,12 +308,16 @@ app.post(
         .select('id')
         .single();
 
-      if (error) {
-        console.error(error);
-        return res.status(500).json({
-          error: 'Impossible de créer l’objet'
-        });
-      }
+     if (error) {
+  console.error('ERREUR SUPABASE INSERT PRODUCT:', error);
+
+  return res.status(500).json({
+    error: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint
+  });
+}
 
       res.json({
         id: data.id
