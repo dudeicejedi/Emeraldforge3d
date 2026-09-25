@@ -1,1 +1,69 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071009">
+  <meta name="description" content="Enquête Emerald Forge 3D — objets fantasy, science-fiction et geek imprimés en 3D.">
+  <title>Emerald Forge 3D — Enquête</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <header class="hero">
+    <div class="brand-wrap">
+      <img src="/assets/logo.png" class="logo" alt="Emerald Forge 3D">
+    </div>
+    <div class="intro">
+      <div class="eyebrow"><span></span> ENQUÊTE DE COLLECTION <span></span></div>
+      <h1>Que devrait-on <em>forger</em> ensuite ?</h1>
+      <p>Nous préparons une collection d'objets imprimés en 3D inspirés de la fantasy, de la science-fiction et de la culture geek.</p>
+      <p>Découvrez quelques créations et dites-nous <strong>ce que vous achèteriez, pourquoi et à quel prix.</strong></p>
+      <p class="small-note">Il n'y a rien à acheter aujourd'hui. Votre avis nous aide à construire la future collection.</p>
+    </div>
+  </header>
 
+  <main>
+    <div class="survey-bar">
+      <div><span class="forge-dot"></span><strong>Collection en préparation</strong></div>
+      <span id="progressText">Chargement des créations…</span>
+    </div>
+    <div id="loading" class="loading"><span class="spinner"></span> La forge prépare les créations…</div>
+    <section id="products" aria-live="polite"></section>
+    <section id="thanks" class="thanks hidden">
+      <div class="thanks-mark">✓</div>
+      <div class="eyebrow"><span></span> AVIS ENREGISTRÉ <span></span></div>
+      <h2>Merci d'avoir contribué à la forge.</h2>
+      <p>Votre réponse a bien été enregistrée. Vous pouvez continuer à découvrir les autres créations.</p>
+      <button class="gold-button" onclick="location.reload()">Continuer l'enquête</button>
+    </section>
+  </main>
+
+  <footer><span>EMERALD FORGE 3D</span><span>•</span><span>Fantasy · Sci-Fi · Geek · 3D</span></footer>
+
+  <button class="admin-dot" aria-label="Administration" title="Administration" onclick="openAdmin()">◆</button>
+  <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+    <div class="panel">
+      <button class="close" onclick="closeAdmin()" aria-label="Fermer">×</button>
+      <div id="adminLogin">
+        <div class="admin-icon">⚒</div>
+        <div class="eyebrow"><span></span> ACCÈS ATELIER <span></span></div>
+        <h2 id="adminTitle">Atelier privé</h2>
+        <p>Gestion de la collection et des réponses.</p>
+        <input id="password" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+        <button class="gold-button full" onclick="login()">Entrer dans l'atelier</button>
+        <div id="loginError" class="error"></div>
+      </div>
+      <div id="adminApp" class="hidden">
+        <div class="adminHead"><div><div class="eyebrow left"><span></span> ATELIER</div><h2>Emerald Forge 3D</h2></div><button onclick="logout()">Déconnexion</button></div>
+        <div class="tabs"><button class="tab active" id="tabFiches" onclick="showTab('fiches')">Fiches</button><button class="tab" id="tabStats" onclick="showTab('stats')">Résultats</button></div>
+        <div id="fiches"></div><div id="stats" class="hidden"></div>
+      </div>
+    </div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
