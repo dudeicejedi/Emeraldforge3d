@@ -452,7 +452,7 @@ app.get('/api/admin/stats', admin, async (req, res) => {
     const { data: responses, error: responsesError } =
       await supabase
         .from('responses')
-        .select('product_id,price_choice,uses');
+        .select('product_id,price_choice,uses,interest');
 
     if (responsesError) {
       throw responsesError;
@@ -465,6 +465,9 @@ app.get('/api/admin/stats', admin, async (req, res) => {
 
       const priceMap = {};
       const usesMap = {};
+      const interestMap = {};
+      let interestSum = 0;
+      let interestCount = 0;
 
       for (const row of rows) {
         const price = row.price_choice;
@@ -478,6 +481,15 @@ app.get('/api/admin/stats', admin, async (req, res) => {
 
         if (use) {
           usesMap[use] = (usesMap[use] || 0) + 1;
+        }
+
+        const interest = row.interest;
+
+        if (interest !== null && interest !== undefined) {
+          const key = String(interest);
+          interestMap[key] = (interestMap[key] || 0) + 1;
+          interestSum += Number(interest);
+          interestCount += 1;
         }
       }
 
@@ -495,8 +507,28 @@ app.get('/api/admin/stats', admin, async (req, res) => {
             uses,
             c: count
           }))
-          .sort((a, b) => b.c - a.c)
+          .sort((a, b) => b.c - a.c),
+        interest: {
+          avg: interestCount
+            ? Number((interestSum / interestCount).toFixed(2))
+            : null,
+          count: interestCount,
+          distribution: Object.entries(interestMap)
+            .map(([score, count]) => ({
+              score: Number(score),
+              c: count
+            }))
+            .sort((a, b) => a.score - b.score)
+        }
       };
+    });
+
+    // Trie les fiches par intérêt moyen décroissant (les non évaluées en dernier)
+    stats.sort((a, b) => {
+      if (a.interest.avg === null && b.interest.avg === null) return 0;
+      if (a.interest.avg === null) return 1;
+      if (b.interest.avg === null) return -1;
+      return b.interest.avg - a.interest.avg;
     });
 
     res.json(stats);
