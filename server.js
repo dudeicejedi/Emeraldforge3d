@@ -452,7 +452,7 @@ app.get('/api/admin/stats', admin, async (req, res) => {
     const { data: responses, error: responsesError } =
       await supabase
         .from('responses')
-        .select('product_id,price_choice,uses,interest');
+        .select('product_id,price_choice,uses,interest,other');
 
     if (responsesError) {
       throw responsesError;
@@ -466,6 +466,7 @@ app.get('/api/admin/stats', admin, async (req, res) => {
       const priceMap = {};
       const usesMap = {};
       const interestMap = {};
+      const comments = [];
       let interestSum = 0;
       let interestCount = 0;
 
@@ -490,6 +491,12 @@ app.get('/api/admin/stats', admin, async (req, res) => {
           interestMap[key] = (interestMap[key] || 0) + 1;
           interestSum += Number(interest);
           interestCount += 1;
+        }
+
+        const other = (row.other || '').trim();
+
+        if (other) {
+          comments.push(other);
         }
       }
 
@@ -519,7 +526,8 @@ app.get('/api/admin/stats', admin, async (req, res) => {
               c: count
             }))
             .sort((a, b) => a.score - b.score)
-        }
+        },
+        comments
       };
     });
 
@@ -536,6 +544,75 @@ app.get('/api/admin/stats', admin, async (req, res) => {
     console.error(error);
     res.status(500).json({
       error: 'Impossible de charger les statistiques'
+    });
+  }
+});
+
+app.get('/api/admin/export.csv', admin, async (req, res) => {
+  try {
+    const { data: products, error: productsError } =
+      await supabase.from('products').select('id,name');
+
+    if (productsError) {
+      throw productsError;
+    }
+
+    const nameById = Object.fromEntries(
+      (products || []).map(p => [p.id, p.name])
+    );
+
+    const { data: responses, error: responsesError } =
+      await supabase
+        .from('responses')
+        .select('*')
+        .order('id', { ascending: true });
+
+    if (responsesError) {
+      throw responsesError;
+    }
+
+    const headers = [
+      'id',
+      'creation',
+      'prix_propose',
+      'utilisations',
+      'interet',
+      'autre_idee',
+      'date'
+    ];
+
+    const csvEscape = value => {
+      const s = String(value ?? '');
+      return /[",;\n]/.test(s)
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+    };
+
+    const rows = (responses || []).map(row => [
+      row.id ?? '',
+      nameById[row.product_id] || row.product_id,
+      row.price_choice ?? '',
+      row.uses ?? '',
+      row.interest ?? '',
+      row.other ?? '',
+      row.created_at ?? ''
+    ]);
+
+    const csv = [headers.join(',')]
+      .concat(rows.map(r => r.map(csvEscape).join(',')))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="emerald-forge-reponses.csv"'
+    );
+    // BOM pour un affichage correct des accents dans Excel
+    res.send('\uFEFF' + csv);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: 'Export impossible'
     });
   }
 });
