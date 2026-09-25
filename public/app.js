@@ -31,7 +31,62 @@ function adminCard(p){return `<div class="admin-card"><div class="row-actions"><
 function formHtml(p={}){return `<div class="admin-card" id="form-${p.id||'new'}"><h3>${p.id?'Modifier':'Nouvelle'} fiche</h3><div class="formgrid"><label>Nom<input id="f-name" value="${esc(p.name||'')}"></label><label>Catégorie<input id="f-category" value="${esc(p.category||'Fantasy')}"></label><label>Description<textarea id="f-description">${esc(p.description||'')}</textarea></label><label>Image<input id="f-image-file" type="file" accept="image/*"><input id="f-image" placeholder="ou URL d'image" value="${esc(p.image||'')}"></label><label>Largeur cm<input id="f-width" type="number" step="0.1" value="${p.width??''}"></label><label>Hauteur cm<input id="f-height" type="number" step="0.1" value="${p.height??''}"></label><label>Profondeur cm<input id="f-depth" type="number" step="0.1" value="${p.depth??''}"></label><label>Poids g<input id="f-weight" type="number" step="1" value="${p.weight??''}"></label><label>Temps d'impression h<input id="f-hours" type="number" step="0.1" value="${p.print_hours??''}"></label><label>Matière<input id="f-material" value="${esc(p.material||'PLA')}"></label><label>Prix 1<input id="f-p1" type="number" step="0.01" value="${p.price1??''}"></label><label>Prix 2<input id="f-p2" type="number" step="0.01" value="${p.price2??''}"></label><label>Prix 3<input id="f-p3" type="number" step="0.01" value="${p.price3??''}"></label><label>Prix 4<input id="f-p4" type="number" step="0.01" value="${p.price4??''}"></label><label>Ordre<input id="f-order" type="number" value="${p.sort_order??0}"></label><label>Visible<select id="f-active"><option value="1" ${p.active!==0?'selected':''}>Oui</option><option value="0" ${p.active===0?'selected':''}>Non</option></select></label></div><button class="gold-button" style="width:auto" onclick="saveForm(${p.id||'null'})">Enregistrer</button> <button onclick="loadAdmin()">Annuler</button></div>`}
 function newForm(){$('#forms').innerHTML=formHtml()}
 async function editForm(id){const r=await fetch('/api/admin/products');const ps=await r.json();const p=ps.find(x=>x.id===id);$('#forms').innerHTML=formHtml(p);document.querySelector('#forms').scrollIntoView({behavior:'smooth',block:'start'})}
-async function saveForm(id){const fd=new FormData();const vals={name:'f-name',category:'f-category',description:'f-description',image:'f-image',width:'f-width',height:'f-height',depth:'f-depth',weight:'f-weight',print_hours:'f-hours',material:'f-material',price1:'f-p1',price2:'f-p2',price3:'f-p3',price4:'f-p4',sort_order:'f-order',active:'f-active'};for(const [k,s] of Object.entries(vals))fd.append(k,$('#'+s).value);const file=$('#f-image-file').files[0];if(file){fd.delete('image');fd.append('image',file)}const r=await fetch(id?`/api/admin/products/${id}`:'/api/admin/products',{method:id?'PUT':'POST',body:fd});if(!r.ok){alert('Erreur lors de l’enregistrement');return}loadAdmin()}
+async function saveForm(id){
+  const fd=new FormData();
+
+  const vals={
+    name:'f-name',
+    category:'f-category',
+    description:'f-description',
+    image:'f-image',
+    width:'f-width',
+    height:'f-height',
+    depth:'f-depth',
+    weight:'f-weight',
+    print_hours:'f-hours',
+    material:'f-material',
+    price1:'f-p1',
+    price2:'f-p2',
+    price3:'f-p3',
+    price4:'f-p4',
+    sort_order:'f-order',
+    active:'f-active'
+  };
+
+  for(const [k,s] of Object.entries(vals)){
+    fd.append(k,$('#'+s).value);
+  }
+
+  const file=$('#f-image-file').files[0];
+
+  if(file){
+    fd.delete('image');
+    fd.append('image',file);
+  }
+
+  const r=await fetch(
+    id ? `/api/admin/products/${id}` : '/api/admin/products',
+    {
+      method:id ? 'PUT' : 'POST',
+      body:fd
+    }
+  );
+
+  if(!r.ok){
+    const error=await r.json().catch(()=>({}));
+
+    console.error('ERREUR ENREGISTREMENT:',error);
+
+    alert(
+      'Erreur lors de l’enregistrement :\n\n' +
+      (error.error || 'Erreur inconnue')
+    );
+
+    return;
+  }
+
+  loadAdmin();
+}
 async function deleteProduct(id){if(!confirm('Supprimer cette fiche et conserver ses réponses ?'))return;const r=await fetch('/api/admin/products/'+id,{method:'DELETE'});if(r.ok)loadAdmin();else alert('Suppression impossible.')}
 async function loadStats(){const r=await fetch('/api/admin/stats');if(!r.ok)return;const ss=await r.json();let total=ss.reduce((a,s)=>a+s.responses,0);$('#stats').innerHTML=`<div class="mini-grid"><div class="mini"><b>${ss.length}</b><span>créations</span></div><div class="mini"><b>${total}</b><span>réponses</span></div><div class="mini"><b>${ss.filter(s=>s.responses>0).length}</b><span>créations évaluées</span></div></div>`+(ss.map(s=>{const max=Math.max(...s.prices.map(x=>x.c),1);return `<div class="statsbox"><h3>${esc(s.product.name)}</h3><p><strong>${s.responses}</strong> réponses</p><p><strong>Prix proposés</strong></p>${s.prices.map(x=>`<div>${x.price_choice==null?'Non choisi':x.price_choice+' €'} — ${x.c} (${Math.round(x.c/Math.max(s.responses,1)*100)}%)</div><div class="statline"><i style="width:${Math.round(x.c/max*100)}%"></i></div>`).join('')||'<p>Aucun prix sélectionné.</p>'}<p><strong>Utilisations</strong></p>${s.uses.map(x=>`<div>${esc(x.uses||'Non renseigné')} — ${x.c}</div>`).join('')||'<p>Aucune donnée.</p>'}</div>`}).join(''))||'<p>Aucune réponse.</p>'}
 loadProducts();
