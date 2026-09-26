@@ -66,6 +66,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // UPLOAD IMAGES
 // =========================================
 
+const MAX_IMAGES = 5;
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -97,6 +99,19 @@ function numOrNull(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function parseImagesField(value) {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(x => typeof x === 'string' && x) : [];
+  } catch {
+    return [];
+  }
+}
+
 async function uploadImage(file) {
   if (!file) {
     return '';
@@ -126,6 +141,20 @@ async function uploadImage(file) {
     .getPublicUrl(filename);
 
   return data.publicUrl;
+}
+
+async function uploadImages(files) {
+  if (!files || !files.length) {
+    return [];
+  }
+
+  const urls = [];
+
+  for (const file of files) {
+    urls.push(await uploadImage(file));
+  }
+
+  return urls;
 }
 
 // =========================================
@@ -272,22 +301,20 @@ app.get('/api/admin/products', admin, async (req, res) => {
 app.post(
   '/api/admin/products',
   admin,
-  upload.single('image'),
+  upload.array('images', MAX_IMAGES),
   async (req, res) => {
     try {
       const b = req.body;
 
-      let image = b.image || '';
-
-      if (req.file) {
-        image = await uploadImage(req.file);
-      }
+      const newImages = await uploadImages(req.files);
+      const images = newImages.slice(0, MAX_IMAGES);
 
       const product = {
         name: b.name,
         description: b.description || '',
         category: b.category || 'Fantasy',
-        image,
+        image: images[0] || '',
+        images,
         width: numOrNull(b.width),
         height: numOrNull(b.height),
         depth: numOrNull(b.depth),
@@ -296,8 +323,6 @@ app.post(
         material: b.material || 'PLA',
         price1: numOrNull(b.price1),
         price2: numOrNull(b.price2),
-        price3: numOrNull(b.price3),
-        price4: numOrNull(b.price4),
         active: b.active === '0' ? 0 : 1,
         sort_order: numOrNull(b.sort_order) ?? 0
       };
@@ -334,7 +359,7 @@ app.post(
 app.put(
   '/api/admin/products/:id',
   admin,
-  upload.single('image'),
+  upload.array('images', MAX_IMAGES),
   async (req, res) => {
     try {
       const b = req.body;
@@ -358,20 +383,16 @@ app.put(
         });
       }
 
-      let image =
-        b.image !== undefined
-          ? b.image
-          : old.image || '';
-
-      if (req.file) {
-        image = await uploadImage(req.file);
-      }
+      const keptImages = parseImagesField(b.existingImages);
+      const newImages = await uploadImages(req.files);
+      const images = [...keptImages, ...newImages].slice(0, MAX_IMAGES);
 
       const product = {
         name: b.name,
         description: b.description || '',
         category: b.category || 'Fantasy',
-        image,
+        image: images[0] || '',
+        images,
         width: numOrNull(b.width),
         height: numOrNull(b.height),
         depth: numOrNull(b.depth),
@@ -380,8 +401,6 @@ app.put(
         material: b.material || 'PLA',
         price1: numOrNull(b.price1),
         price2: numOrNull(b.price2),
-        price3: numOrNull(b.price3),
-        price4: numOrNull(b.price4),
         active: b.active === '0' ? 0 : 1,
         sort_order: numOrNull(b.sort_order) ?? 0
       };
