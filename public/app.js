@@ -47,7 +47,31 @@ function card(p,i){
   }else{
     priceBlock=`<div class="question">Prix non encore défini pour cette création.</div>`;
   }
-  return `<article class="card" id="product-${p.id}"><div class="card-grid"><div class="image-wrap"><img class="product-img" src="${esc(p.image||'/assets/logo.png')}" alt="${esc(p.name)}"></div><div class="content"><div class="content-head"><span class="tag">${esc(p.category||'Création')}</span><button type="button" class="share-btn" onclick="shareProduct(${p.id})">🔗 Partager</button></div><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div><div class="spec spec-custom">🎨 Couleur &amp; taille personnalisables</div></div>${priceBlock}<div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
+  const gallery=(Array.isArray(p.images)&&p.images.length?p.images:(p.image?[p.image]:['/assets/logo.png']));
+  const galleryAttr=esc(gallery.join('|'));
+  const imageBlock=`<div class="image-wrap" data-gallery="${galleryAttr}" data-idx="0">
+    <img class="product-img" id="img-${p.id}" src="${esc(gallery[0])}" alt="${esc(p.name)}">
+    ${gallery.length>1?`<button type="button" onclick="galNav(${p.id},-1)" aria-label="Image précédente" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:1px solid #35563e;background:#0009;color:#f1d28a;font-size:1.1rem;line-height:1;cursor:pointer;display:grid;place-items:center;z-index:2;backdrop-filter:blur(4px)">‹</button><button type="button" onclick="galNav(${p.id},1)" aria-label="Image suivante" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:1px solid #35563e;background:#0009;color:#f1d28a;font-size:1.1rem;line-height:1;cursor:pointer;display:grid;place-items:center;z-index:2;backdrop-filter:blur(4px)">›</button><div id="dots-${p.id}" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:2">${gallery.map((_,gi)=>`<span id="dot-${p.id}-${gi}" style="width:7px;height:7px;border-radius:50%;background:${gi===0?'#f1d28a':'#ffffff55'};box-shadow:${gi===0?'0 0 8px #f1d28a99':'none'};transition:.15s"></span>`).join('')}</div>`:''}
+  </div>`;
+  return `<article class="card" id="product-${p.id}"><div class="card-grid">${imageBlock}<div class="content"><div class="content-head"><span class="tag">${esc(p.category||'Création')}</span><button type="button" class="share-btn" onclick="shareProduct(${p.id})">🔗 Partager</button></div><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div><div class="spec spec-custom">🎨 Couleur &amp; taille personnalisables</div></div>${priceBlock}<div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
+}
+function galNav(id,dir){
+  const wrap=document.querySelector(`#product-${id} .image-wrap`);
+  if(!wrap)return;
+  const gallery=(wrap.dataset.gallery||'').split('|').filter(Boolean);
+  if(gallery.length<2)return;
+  let idx=(Number(wrap.dataset.idx)||0)+dir;
+  if(idx<0)idx=gallery.length-1;
+  if(idx>=gallery.length)idx=0;
+  wrap.dataset.idx=idx;
+  const img=$(`#img-${id}`);
+  if(img)img.src=gallery[idx];
+  gallery.forEach((_,gi)=>{
+    const dot=$(`#dot-${id}-${gi}`);
+    if(!dot)return;
+    dot.style.background=gi===idx?'#f1d28a':'#ffffff55';
+    dot.style.boxShadow=gi===idx?'0 0 8px #f1d28a99':'none';
+  });
 }
 function onPriceSlide(id){
   const el=$(`#price-${id}`);
@@ -70,6 +94,21 @@ async function sendResponse(id,btn){
   catch(e){btn.disabled=false;btn.textContent='Réessayer';alert('Votre réponse n’a pas pu être enregistrée.');}
 }
 function updateProgress(){const n=answered.size;$('#progressText').textContent=`${n}/${productCount} création${productCount>1?'s':''} évaluée${productCount>1?'s':''}`}
+let formImages=[], formNewFiles=[];
+function renderImagePreviews(){
+  const c=$('#imgPreviews');
+  if(!c)return;
+  const existing=formImages.map((url,idx)=>`<div style="position:relative;width:70px;height:70px;border-radius:8px;overflow:hidden;border:1px solid #304536;background:#080e0a"><img src="${esc(url)}" style="width:100%;height:100%;object-fit:cover;display:block"><button type="button" onclick="removeExistingImage(${idx})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:0;background:#000a;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:grid;place-items:center">✕</button></div>`).join('');
+  const pending=formNewFiles.map((f,idx)=>`<div style="position:relative;width:70px;height:70px;border-radius:8px;border:1px dashed #a67a2c;background:#1a1408;color:#f1d28a;font-size:.6rem;display:flex;align-items:center;justify-content:center;text-align:center;padding:3px;overflow:hidden">🆕 ${esc(f.name)}<button type="button" onclick="removeNewFile(${idx})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:0;background:#000a;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:grid;place-items:center">✕</button></div>`).join('');
+  c.innerHTML=(existing+pending)||'<p style="opacity:.6;font-size:.8em;margin:0">Aucune photo</p>';
+}
+function removeExistingImage(idx){formImages.splice(idx,1);renderImagePreviews();}
+function removeNewFile(idx){formNewFiles.splice(idx,1);renderImagePreviews();}
+function onNewFilesSelected(evt){
+  formNewFiles.push(...[...evt.target.files]);
+  evt.target.value='';
+  renderImagePreviews();
+}
 function openAdmin(){$('#adminModal').classList.remove('hidden');document.body.style.overflow='hidden';checkAdmin();}
 function closeAdmin(){$('#adminModal').classList.add('hidden');document.body.style.overflow='';}
 async function checkAdmin(){const r=await fetch('/api/me');const x=await r.json();$('#adminLogin').classList.toggle('hidden',x.admin);$('#adminApp').classList.toggle('hidden',!x.admin);if(x.admin)loadAdmin();else setTimeout(()=>$('#password')?.focus(),50)}
@@ -83,9 +122,9 @@ async function loadAdmin(){
   $('#fiches').innerHTML=`<div class="admin-card qr-card"><h3>QR code de l'enquête</h3><img src="${qrImg}" alt="QR code de l'enquête" width="220" height="220" style="display:block;margin:8px 0;border-radius:8px"><p style="font-size:.85em;word-break:break-all">${esc(qrUrl)}</p><a class="gold-button" style="width:auto;display:inline-block;text-decoration:none" href="${qrImg}" target="_blank" rel="noopener">⬇ Ouvrir / télécharger le QR code</a></div><button class="gold-button" style="width:auto;margin:14px 0 10px" onclick="newForm()">＋ Nouvelle fiche</button><div id="forms"></div>${ps.map(p=>adminCard(p)).join('')}`
 }
 function adminCard(p){return `<div class="admin-card"><div class="row-actions"><strong>${esc(p.name)}</strong><span>${p.active?'🟢 active':'⚪ masqué'}</span><button onclick="editForm(${p.id})">Modifier</button><button onclick="deleteProduct(${p.id})">Supprimer</button></div></div>`}
-function formHtml(p={}){return `<div class="admin-card" id="form-${p.id||'new'}"><h3>${p.id?'Modifier':'Nouvelle'} fiche</h3><div class="formgrid"><label>Nom<input id="f-name" value="${esc(p.name||'')}"></label><label>Catégorie<input id="f-category" value="${esc(p.category||'Fantasy')}"></label><label>Description<textarea id="f-description">${esc(p.description||'')}</textarea></label><label>Image<input id="f-image-file" type="file" accept="image/*"><input id="f-image" placeholder="ou URL d'image" value="${esc(p.image||'')}"></label><label>Largeur cm<input id="f-width" type="number" step="0.1" value="${p.width??''}"></label><label>Hauteur cm<input id="f-height" type="number" step="0.1" value="${p.height??''}"></label><label>Profondeur cm<input id="f-depth" type="number" step="0.1" value="${p.depth??''}"></label><label>Poids g<input id="f-weight" type="number" step="1" value="${p.weight??''}"></label><label>Temps d'impression h<input id="f-hours" type="number" step="0.1" value="${p.print_hours??''}"></label><label>Matière<input id="f-material" value="${esc(p.material||'PLA')}"></label><label>Prix mini (€)<input id="f-p-min" type="number" step="0.01" value="${p.price1??''}"></label><label>Prix maxi (€)<input id="f-p-max" type="number" step="0.01" value="${p.price2??''}"></label><label>Ordre<input id="f-order" type="number" value="${p.sort_order??0}"></label><label>Visible<select id="f-active"><option value="1" ${p.active!==0?'selected':''}>Oui</option><option value="0" ${p.active===0?'selected':''}>Non</option></select></label></div><button class="gold-button" style="width:auto" onclick="saveForm(${p.id||'null'})">Enregistrer</button> <button onclick="loadAdmin()">Annuler</button></div>`}
-function newForm(){$('#forms').innerHTML=formHtml()}
-async function editForm(id){const r=await fetch('/api/admin/products');const ps=await r.json();const p=ps.find(x=>x.id===id);$('#forms').innerHTML=formHtml(p);document.querySelector('#forms').scrollIntoView({behavior:'smooth',block:'start'})}
+function formHtml(p={}){return `<div class="admin-card" id="form-${p.id||'new'}"><h3>${p.id?'Modifier':'Nouvelle'} fiche</h3><div class="formgrid"><label>Nom<input id="f-name" value="${esc(p.name||'')}"></label><label>Catégorie<input id="f-category" value="${esc(p.category||'Fantasy')}"></label><label style="grid-column:1/-1">Description<textarea id="f-description">${esc(p.description||'')}</textarea></label><label style="grid-column:1/-1">Photos <small>(5 max)</small><div id="imgPreviews" style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0"></div><input id="f-image-files" type="file" accept="image/*" multiple onchange="onNewFilesSelected(event)"></label><label>Largeur cm<input id="f-width" type="number" step="0.1" value="${p.width??''}"></label><label>Hauteur cm<input id="f-height" type="number" step="0.1" value="${p.height??''}"></label><label>Profondeur cm<input id="f-depth" type="number" step="0.1" value="${p.depth??''}"></label><label>Poids g<input id="f-weight" type="number" step="1" value="${p.weight??''}"></label><label>Temps d'impression h<input id="f-hours" type="number" step="0.1" value="${p.print_hours??''}"></label><label>Matière<input id="f-material" value="${esc(p.material||'PLA')}"></label><label>Prix mini (€)<input id="f-p-min" type="number" step="0.01" value="${p.price1??''}"></label><label>Prix maxi (€)<input id="f-p-max" type="number" step="0.01" value="${p.price2??''}"></label><label>Ordre<input id="f-order" type="number" value="${p.sort_order??0}"></label><label>Visible<select id="f-active"><option value="1" ${p.active!==0?'selected':''}>Oui</option><option value="0" ${p.active===0?'selected':''}>Non</option></select></label></div><button class="gold-button" style="width:auto" onclick="saveForm(${p.id||'null'})">Enregistrer</button> <button onclick="loadAdmin()">Annuler</button></div>`}
+function newForm(){formImages=[];formNewFiles=[];$('#forms').innerHTML=formHtml();renderImagePreviews()}
+async function editForm(id){const r=await fetch('/api/admin/products');const ps=await r.json();const p=ps.find(x=>x.id===id);formImages=Array.isArray(p.images)&&p.images.length?[...p.images]:(p.image?[p.image]:[]);formNewFiles=[];$('#forms').innerHTML=formHtml(p);renderImagePreviews();document.querySelector('#forms').scrollIntoView({behavior:'smooth',block:'start'})}
 async function saveForm(id){
   const fd=new FormData();
 
@@ -93,7 +132,6 @@ async function saveForm(id){
     name:'f-name',
     category:'f-category',
     description:'f-description',
-    image:'f-image',
     width:'f-width',
     height:'f-height',
     depth:'f-depth',
@@ -110,12 +148,8 @@ async function saveForm(id){
     fd.append(k,$('#'+s).value);
   }
 
-  const file=$('#f-image-file').files[0];
-
-  if(file){
-    fd.delete('image');
-    fd.append('image',file);
-  }
+  fd.append('existingImages',JSON.stringify(formImages));
+  formNewFiles.forEach(f=>fd.append('images',f));
 
   const r=await fetch(
     id ? `/api/admin/products/${id}` : '/api/admin/products',
