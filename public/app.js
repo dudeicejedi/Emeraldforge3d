@@ -96,6 +96,91 @@ function galNav(id,dir,auto=false){
     dot.style.boxShadow=gi===idx?'0 0 8px #f1d28a99':'none';
   });
 }
+let lightboxState={id:null,idx:0,gallery:[]};
+function ensureLightbox(){
+  if($('#lightboxOverlay'))return;
+  const ov=document.createElement('div');
+  ov.id='lightboxOverlay';
+  ov.className='hidden';
+  ov.style.cssText='position:fixed;inset:0;background:#000d;z-index:60;backdrop-filter:blur(10px)';
+  ov.onclick=(e)=>{if(e.target===ov)closeLightbox();};
+  ov.innerHTML=`<button type="button" onclick="closeLightbox()" aria-label="Fermer" style="position:fixed;right:16px;top:14px;background:none;border:0;color:#f6f4ee;font-size:34px;cursor:pointer;line-height:1;z-index:2">×</button>
+    <div style="position:relative;max-width:min(900px,94vw);max-height:88vh;margin:6vh auto 0">
+      <img id="lightboxImg" src="" alt="" style="display:block;max-width:100%;max-height:80vh;border-radius:14px;box-shadow:0 30px 100px #000;margin:auto" ontouchstart="lightboxTouchStart(event)" ontouchend="lightboxTouchEnd(event)">
+      <button type="button" id="lightboxPrev" onclick="event.stopPropagation();lightboxNav(-1)" aria-label="Image précédente" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:1px solid #35563e;background:#0009;color:#f1d28a;font-size:1.3rem;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(4px)">‹</button>
+      <button type="button" id="lightboxNext" onclick="event.stopPropagation();lightboxNav(1)" aria-label="Image suivante" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:1px solid #35563e;background:#0009;color:#f1d28a;font-size:1.3rem;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(4px)">›</button>
+      <div id="lightboxDots" style="display:flex;justify-content:center;gap:6px;margin-top:14px"></div>
+    </div>`;
+  document.body.appendChild(ov);
+}
+function openLightbox(id){
+  const wrap=document.querySelector(`#product-${id} .image-wrap`);
+  if(!wrap)return;
+  const gallery=(wrap.dataset.gallery||'').split('|').filter(Boolean);
+  if(!gallery.length)return;
+  stopAutoplay(id);
+  ensureLightbox();
+  lightboxState={id,idx:Number(wrap.dataset.idx)||0,gallery};
+  renderLightbox();
+  $('#lightboxOverlay').classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function closeLightbox(){
+  const ov=$('#lightboxOverlay');
+  if(ov)ov.classList.add('hidden');
+  document.body.style.overflow='';
+  const {id,idx,gallery}=lightboxState;
+  if(id!=null){
+    const wrap=document.querySelector(`#product-${id} .image-wrap`);
+    if(wrap){
+      wrap.dataset.idx=idx;
+      const img=$(`#img-${id}`);
+      if(img&&gallery[idx])img.src=gallery[idx];
+      gallery.forEach((_,gi)=>{
+        const dot=$(`#dot-${id}-${gi}`);
+        if(!dot)return;
+        dot.style.background=gi===idx?'#f1d28a':'#ffffff55';
+        dot.style.boxShadow=gi===idx?'0 0 8px #f1d28a99':'none';
+      });
+    }
+  }
+}
+function lightboxNav(dir){
+  const {gallery}=lightboxState;
+  if(gallery.length<2)return;
+  let idx=lightboxState.idx+dir;
+  if(idx<0)idx=gallery.length-1;
+  if(idx>=gallery.length)idx=0;
+  lightboxState.idx=idx;
+  renderLightbox();
+}
+function renderLightbox(){
+  const {idx,gallery}=lightboxState;
+  const img=$('#lightboxImg');
+  if(img)img.src=gallery[idx];
+  const multi=gallery.length>1;
+  const prevBtn=$('#lightboxPrev'), nextBtn=$('#lightboxNext');
+  if(prevBtn)prevBtn.style.display=multi?'grid':'none';
+  if(nextBtn)nextBtn.style.display=multi?'grid':'none';
+  const dots=$('#lightboxDots');
+  if(dots)dots.innerHTML=multi?gallery.map((_,gi)=>`<span style="width:7px;height:7px;border-radius:50%;background:${gi===idx?'#f1d28a':'#ffffff55'};box-shadow:${gi===idx?'0 0 8px #f1d28a99':'none'}"></span>`).join(''):'';
+}
+function lightboxTouchStart(e){
+  e.currentTarget.dataset.touchX=(e.touches&&e.touches[0])?e.touches[0].clientX:0;
+}
+function lightboxTouchEnd(e){
+  const startX=Number(e.currentTarget.dataset.touchX||0);
+  const endX=(e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:startX;
+  const diff=endX-startX;
+  if(Math.abs(diff)>40)lightboxNav(diff<0?1:-1);
+}
+document.addEventListener('keydown',(e)=>{
+  const ov=$('#lightboxOverlay');
+  if(!ov||ov.classList.contains('hidden'))return;
+  if(e.key==='ArrowLeft')lightboxNav(-1);
+  else if(e.key==='ArrowRight')lightboxNav(1);
+  else if(e.key==='Escape')closeLightbox();
+});
 function onPriceSlide(id){
   const el=$(`#price-${id}`);
   const steps=(el.dataset.priceSteps||'').split(',').filter(Boolean).map(Number);
