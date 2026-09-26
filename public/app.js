@@ -157,7 +157,7 @@ async function loadStats(){
       <h3>${esc(s.product.name)} ${interestBadge}</h3>
       <p><strong>${s.responses}</strong> réponse${s.responses>1?'s':''}${avgPrice?` · prix moyen proposé : <strong>${avgPrice} €</strong>`:''}</p>
       ${(s.interest?.distribution?.length)?`<p><strong>Intérêt</strong> <small>(${s.interest.count} note${s.interest.count>1?'s':''})</small></p>
-      ${s.interest.distribution.slice().reverse().map(x=>`<div class="stat-row"><span>${x.score}/5</span><span>${x.c} · ${Math.round(x.c/Math.max(s.interest.count,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxDist*100)}%"></i></div>`).join(''):''}`:''}
+      ${s.interest.distribution.slice().reverse().map(x=>`<div class="stat-row"><span>${x.score}/5</span><span>${x.c} · ${Math.round(x.c/Math.max(s.interest.count,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxDist*100)}%"></i></div>`).join('')}`:''}
       <p><strong>Prix proposés</strong>${noPriceCount>0?` <small>(${noPriceCount} sans choix)</small>`:''}</p>
       ${sortedPrices.length?sortedPrices.map(x=>`<div class="stat-row"><span>${x.price_choice==null?'Non choisi':x.price_choice+' €'}</span><span>${x.c} · ${Math.round(x.c/Math.max(s.responses,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxPrice*100)}%"></i></div>`).join(''):'<p>Aucun prix sélectionné.</p>'}
       <p><strong>Utilisations</strong></p>
