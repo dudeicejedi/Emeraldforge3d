@@ -4,6 +4,7 @@ let productCount=0, answered=new Set();
 const VOTED_KEY='ef3d_voted';
 function getVotedIds(){try{return JSON.parse(localStorage.getItem(VOTED_KEY)||'[]')}catch(e){return []}}
 function markVoted(id){try{const v=new Set(getVotedIds());v.add(id);localStorage.setItem(VOTED_KEY,JSON.stringify([...v]))}catch(e){}}
+function fmtPrice(n){const r=Math.round(n*100)/100;return Number.isInteger(r)?String(r):r.toFixed(2)}
 function toast(msg){
   const existing=$('#toast');if(existing)existing.remove();
   const el=document.createElement('div');el.id='toast';el.className='toast';el.textContent=msg;
@@ -35,35 +36,37 @@ async function loadProducts(){
   }catch(e){$('#loading').innerHTML='Impossible de charger la collection. Réessayez dans quelques instants.';}
 }
 function card(p,i){
-  const prices=[p.price1,p.price2,p.price3,p.price4].filter(x=>x!=null);
-  return `<article class="card" id="product-${p.id}"><div class="card-grid"><div class="image-wrap"><img class="product-img" src="${esc(p.image||'/assets/logo.png')}" alt="${esc(p.name)}"></div><div class="content"><div class="content-head"><span class="tag">${esc(p.category||'Création')}</span><button type="button" class="share-btn" onclick="shareProduct(${p.id})">🔗 Partager</button></div><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div><div class="spec spec-custom">🎨 Couleur &amp; taille personnalisables</div></div><div class="question">À quel prix pourriez-vous envisager cet objet ? <span class="required">*</span></div><div class="choices" id="choices-${p.id}">${prices.map(x=>`<label><input type="radio" name="price-${p.id}" value="${x}"><span>${x} €</span></label>`).join('')}</div><div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
+  const minP=p.price1, maxP=p.price2;
+  const hasRange = minP!=null && maxP!=null && Number(maxP)>=Number(minP);
+  let priceBlock;
+  if(hasRange){
+    const lo=Number(minP), hi=Number(maxP);
+    const step=(hi-lo)/4;
+    const steps=[0,1,2,3,4].map(k=>Math.round((lo+step*k)*100)/100);
+    priceBlock=`<div class="question">À quel prix pourriez-vous envisager cet objet ?</div><div class="range-row price-range-row"><input type="range" min="1" max="5" value="3" step="1" id="price-${p.id}" data-price-steps="${steps.join(',')}" oninput="onPriceSlide(${p.id})"><span class="range-value" id="priceval-${p.id}">${fmtPrice(steps[2])} €</span></div>`;
+  }else{
+    priceBlock=`<div class="question">Prix non encore défini pour cette création.</div>`;
+  }
+  return `<article class="card" id="product-${p.id}"><div class="card-grid"><div class="image-wrap"><img class="product-img" src="${esc(p.image||'/assets/logo.png')}" alt="${esc(p.name)}"></div><div class="content"><div class="content-head"><span class="tag">${esc(p.category||'Création')}</span><button type="button" class="share-btn" onclick="shareProduct(${p.id})">🔗 Partager</button></div><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div><div class="spec spec-custom">🎨 Couleur &amp; taille personnalisables</div></div>${priceBlock}<div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
 }
-function showPriceRequiredPopup(productId){
-  const existing=$('#priceRequiredModal');
-  if(existing)existing.remove();
-  const modal=document.createElement('div');
-  modal.id='priceRequiredModal';
-  modal.className='popup-overlay';
-  modal.innerHTML=`<div class="popup-box"><h3>Prix manquant</h3><p>Merci de sélectionner un prix avant de valider votre avis. Cette information est indispensable pour nous aider à fixer un tarif juste.</p><button class="gold-button" style="width:auto" onclick="closePriceRequiredPopup()">Compris</button></div>`;
-  document.body.appendChild(modal);
-  document.body.style.overflow='hidden';
-  const choicesEl=$(`#choices-${productId}`);
-  if(choicesEl)choicesEl.classList.add('shake-error');
-  setTimeout(()=>{if(choicesEl)choicesEl.classList.remove('shake-error')},600);
-}
-function closePriceRequiredPopup(){
-  const modal=$('#priceRequiredModal');
-  if(modal)modal.remove();
-  document.body.style.overflow='';
+function onPriceSlide(id){
+  const el=$(`#price-${id}`);
+  const steps=(el.dataset.priceSteps||'').split(',').filter(Boolean).map(Number);
+  const v=steps[Number(el.value)-1];
+  const label=$(`#priceval-${id}`);
+  if(label && v!=null)label.textContent=fmtPrice(v)+' €';
 }
 async function sendResponse(id,btn){
   if(answered.has(id))return;
-  const price=document.querySelector(`input[name="price-${id}"]:checked`);
-  if(!price){showPriceRequiredPopup(id);return;}
-  closePriceRequiredPopup();
+  const priceEl=$(`#price-${id}`);
+  let priceValue=null;
+  if(priceEl){
+    const steps=(priceEl.dataset.priceSteps||'').split(',').filter(Boolean).map(Number);
+    priceValue=steps[Number(priceEl.value)-1]??null;
+  }
   const uses=[...document.querySelectorAll(`input[name="use-${id}"]:checked`)].map(x=>x.value);const interest=$(`#interest-${id}`).value;const other=$(`#other-${id}`).value.trim();
   btn.disabled=true;btn.textContent='Enregistrement…';
-  try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:price.value,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);markVoted(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
+  try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:priceValue,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);markVoted(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
   catch(e){btn.disabled=false;btn.textContent='Réessayer';alert('Votre réponse n’a pas pu être enregistrée.');}
 }
 function updateProgress(){const n=answered.size;$('#progressText').textContent=`${n}/${productCount} création${productCount>1?'s':''} évaluée${productCount>1?'s':''}`}
@@ -75,7 +78,7 @@ async function logout(){await fetch('/api/logout',{method:'POST'});checkAdmin()}
 function showTab(t){$('#fiches').classList.toggle('hidden',t!=='fiches');$('#stats').classList.toggle('hidden',t!=='stats');$('#tabFiches').classList.toggle('active',t==='fiches');$('#tabStats').classList.toggle('active',t==='stats');if(t==='stats')loadStats()}
 async function loadAdmin(){const r=await fetch('/api/admin/products');if(!r.ok)return;const ps=await r.json();$('#fiches').innerHTML=`<button class="gold-button" style="width:auto;margin:0 0 10px" onclick="newForm()">＋ Nouvelle fiche</button><div id="forms"></div>${ps.map(p=>adminCard(p)).join('')}`}
 function adminCard(p){return `<div class="admin-card"><div class="row-actions"><strong>${esc(p.name)}</strong><span>${p.active?'🟢 active':'⚪ masqué'}</span><button onclick="editForm(${p.id})">Modifier</button><button onclick="deleteProduct(${p.id})">Supprimer</button></div></div>`}
-function formHtml(p={}){return `<div class="admin-card" id="form-${p.id||'new'}"><h3>${p.id?'Modifier':'Nouvelle'} fiche</h3><div class="formgrid"><label>Nom<input id="f-name" value="${esc(p.name||'')}"></label><label>Catégorie<input id="f-category" value="${esc(p.category||'Fantasy')}"></label><label>Description<textarea id="f-description">${esc(p.description||'')}</textarea></label><label>Image<input id="f-image-file" type="file" accept="image/*"><input id="f-image" placeholder="ou URL d'image" value="${esc(p.image||'')}"></label><label>Largeur cm<input id="f-width" type="number" step="0.1" value="${p.width??''}"></label><label>Hauteur cm<input id="f-height" type="number" step="0.1" value="${p.height??''}"></label><label>Profondeur cm<input id="f-depth" type="number" step="0.1" value="${p.depth??''}"></label><label>Poids g<input id="f-weight" type="number" step="1" value="${p.weight??''}"></label><label>Temps d'impression h<input id="f-hours" type="number" step="0.1" value="${p.print_hours??''}"></label><label>Matière<input id="f-material" value="${esc(p.material||'PLA')}"></label><label>Prix 1<input id="f-p1" type="number" step="0.01" value="${p.price1??''}"></label><label>Prix 2<input id="f-p2" type="number" step="0.01" value="${p.price2??''}"></label><label>Prix 3<input id="f-p3" type="number" step="0.01" value="${p.price3??''}"></label><label>Prix 4<input id="f-p4" type="number" step="0.01" value="${p.price4??''}"></label><label>Ordre<input id="f-order" type="number" value="${p.sort_order??0}"></label><label>Visible<select id="f-active"><option value="1" ${p.active!==0?'selected':''}>Oui</option><option value="0" ${p.active===0?'selected':''}>Non</option></select></label></div><button class="gold-button" style="width:auto" onclick="saveForm(${p.id||'null'})">Enregistrer</button> <button onclick="loadAdmin()">Annuler</button></div>`}
+function formHtml(p={}){return `<div class="admin-card" id="form-${p.id||'new'}"><h3>${p.id?'Modifier':'Nouvelle'} fiche</h3><div class="formgrid"><label>Nom<input id="f-name" value="${esc(p.name||'')}"></label><label>Catégorie<input id="f-category" value="${esc(p.category||'Fantasy')}"></label><label>Description<textarea id="f-description">${esc(p.description||'')}</textarea></label><label>Image<input id="f-image-file" type="file" accept="image/*"><input id="f-image" placeholder="ou URL d'image" value="${esc(p.image||'')}"></label><label>Largeur cm<input id="f-width" type="number" step="0.1" value="${p.width??''}"></label><label>Hauteur cm<input id="f-height" type="number" step="0.1" value="${p.height??''}"></label><label>Profondeur cm<input id="f-depth" type="number" step="0.1" value="${p.depth??''}"></label><label>Poids g<input id="f-weight" type="number" step="1" value="${p.weight??''}"></label><label>Temps d'impression h<input id="f-hours" type="number" step="0.1" value="${p.print_hours??''}"></label><label>Matière<input id="f-material" value="${esc(p.material||'PLA')}"></label><label>Prix mini (€)<input id="f-p-min" type="number" step="0.01" value="${p.price1??''}"></label><label>Prix maxi (€)<input id="f-p-max" type="number" step="0.01" value="${p.price2??''}"></label><label>Ordre<input id="f-order" type="number" value="${p.sort_order??0}"></label><label>Visible<select id="f-active"><option value="1" ${p.active!==0?'selected':''}>Oui</option><option value="0" ${p.active===0?'selected':''}>Non</option></select></label></div><button class="gold-button" style="width:auto" onclick="saveForm(${p.id||'null'})">Enregistrer</button> <button onclick="loadAdmin()">Annuler</button></div>`}
 function newForm(){$('#forms').innerHTML=formHtml()}
 async function editForm(id){const r=await fetch('/api/admin/products');const ps=await r.json();const p=ps.find(x=>x.id===id);$('#forms').innerHTML=formHtml(p);document.querySelector('#forms').scrollIntoView({behavior:'smooth',block:'start'})}
 async function saveForm(id){
@@ -92,10 +95,8 @@ async function saveForm(id){
     weight:'f-weight',
     print_hours:'f-hours',
     material:'f-material',
-    price1:'f-p1',
-    price2:'f-p2',
-    price3:'f-p3',
-    price4:'f-p4',
+    price1:'f-p-min',
+    price2:'f-p-max',
     sort_order:'f-order',
     active:'f-active'
   };
@@ -156,7 +157,7 @@ async function loadStats(){
       <h3>${esc(s.product.name)} ${interestBadge}</h3>
       <p><strong>${s.responses}</strong> réponse${s.responses>1?'s':''}${avgPrice?` · prix moyen proposé : <strong>${avgPrice} €</strong>`:''}</p>
       ${(s.interest?.distribution?.length)?`<p><strong>Intérêt</strong> <small>(${s.interest.count} note${s.interest.count>1?'s':''})</small></p>
-      ${s.interest.distribution.slice().reverse().map(x=>`<div class="stat-row"><span>${x.score}/5</span><span>${x.c} · ${Math.round(x.c/Math.max(s.interest.count,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxDist*100)}%"></i></div>`).join('')}`:''}
+      ${s.interest.distribution.slice().reverse().map(x=>`<div class="stat-row"><span>${x.score}/5</span><span>${x.c} · ${Math.round(x.c/Math.max(s.interest.count,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxDist*100)}%"></i></div>`).join(''):''}`:''}
       <p><strong>Prix proposés</strong>${noPriceCount>0?` <small>(${noPriceCount} sans choix)</small>`:''}</p>
       ${sortedPrices.length?sortedPrices.map(x=>`<div class="stat-row"><span>${x.price_choice==null?'Non choisi':x.price_choice+' €'}</span><span>${x.c} · ${Math.round(x.c/Math.max(s.responses,1)*100)}%</span></div><div class="statline"><i style="width:${Math.round(x.c/maxPrice*100)}%"></i></div>`).join(''):'<p>Aucun prix sélectionné.</p>'}
       <p><strong>Utilisations</strong></p>
