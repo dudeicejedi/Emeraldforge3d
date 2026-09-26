@@ -17,6 +17,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (
   !ADMIN_PASSWORD ||
@@ -448,6 +449,84 @@ app.delete(
     res.json({
       ok: true
     });
+  }
+);
+
+app.post(
+  '/api/admin/generate',
+  admin,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Aucune image reçue' });
+      }
+
+      if (!GEMINI_API_KEY) {
+        return res.status(500).json({
+          error: 'Clé GEMINI_API_KEY non configurée sur le serveur'
+        });
+      }
+
+      const base64 = req.file.buffer.toString('base64');
+      const mediaType = req.file.mimetype;
+
+      const prompt = `Tu es un artisan qui vend des figurines et objets décoratifs imprimés en 3D (style fantasy / pop culture / cosplay) sur la boutique "Emerald Forge 3D". Regarde la photo et propose une fiche produit.
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte autour, au format exact :
+{"name":"...","category":"...","description":"...","material":"..."}
+
+- "name" : un nom de produit court et accrocheur (5 mots maximum)
+- "category" : une catégorie courte (ex : Fantasy, Pop Culture, Décoration, Cosplay...)
+- "description" : 2 à 3 phrases vendeuses, ton chaleureux et artisanal, qui donnent envie d'acheter
+- "material" : la matière la plus probable au vu de l'aspect visuel (PLA, PLA soie, résine...) — indique "PLA" par défaut si tu n'es pas sûr`;
+
+      const aiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { inline_data: { mime_type: mediaType, data: base64 } },
+                  { text: prompt }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
+        }
+      );
+
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text();
+        console.error('Erreur API Gemini:', errText);
+        return res.status(500).json({ error: 'Erreur de l’IA' });
+      }
+
+      const data = await aiResponse.json();
+      const raw =
+        data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+
+      let parsed;
+
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        console.error('Réponse IA illisible:', cleaned);
+        return res.status(500).json({ error: 'Réponse IA illisible' });
+      }
+
+      res.json(parsed);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
   }
 );
 
