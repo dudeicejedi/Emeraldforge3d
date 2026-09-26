@@ -25,6 +25,10 @@ async function loadProducts(){
   try{const r=await fetch('/api/products');if(!r.ok)throw new Error();const ps=await r.json();productCount=ps.length;$('#loading').classList.add('hidden');$('#progressText').textContent=ps.length?`${ps.length} création${ps.length>1?'s':''} à découvrir`:'Collection en préparation';
     if(!ps.length){$('#products').innerHTML='<div class="thanks"><h2>La forge prépare ses premières créations…</h2><p>Revenez bientôt pour participer à la collection.</p></div>';return}
     $('#products').innerHTML=ps.map((p,i)=>card(p,i)).join('');
+    ps.forEach(p=>{
+      const gallery=(Array.isArray(p.images)&&p.images.length?p.images:(p.image?[p.image]:[]));
+      if(gallery.length>1)startAutoplay(p.id);
+    });
     const votedIds=new Set(getVotedIds());
     answered=new Set(ps.filter(p=>votedIds.has(p.id)).map(p=>p.id));
     answered.forEach(id=>{
@@ -49,17 +53,36 @@ function card(p,i){
   }
   const gallery=(Array.isArray(p.images)&&p.images.length?p.images:(p.image?[p.image]:['/assets/logo.png']));
   const galleryAttr=esc(gallery.join('|'));
-  const imageBlock=`<div class="image-wrap" data-gallery="${galleryAttr}" data-idx="0">
+  const imageBlock=`<div class="image-wrap" data-gallery="${galleryAttr}" data-idx="0"${gallery.length>1?` ontouchstart="galTouchStart(event)" ontouchend="galTouchEnd(${p.id},event)"`:''}>
     <img class="product-img" id="img-${p.id}" src="${esc(gallery[0])}" alt="${esc(p.name)}">
     ${gallery.length>1?`<button type="button" onclick="galNav(${p.id},-1)" aria-label="Image précédente" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:1px solid #35563e;background:#0009;color:#f1d28a;font-size:1.1rem;line-height:1;cursor:pointer;display:grid;place-items:center;z-index:2;backdrop-filter:blur(4px)">‹</button><button type="button" onclick="galNav(${p.id},1)" aria-label="Image suivante" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:1px solid #35563e;background:#0009;color:#f1d28a;font-size:1.1rem;line-height:1;cursor:pointer;display:grid;place-items:center;z-index:2;backdrop-filter:blur(4px)">›</button><div id="dots-${p.id}" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:2">${gallery.map((_,gi)=>`<span id="dot-${p.id}-${gi}" style="width:7px;height:7px;border-radius:50%;background:${gi===0?'#f1d28a':'#ffffff55'};box-shadow:${gi===0?'0 0 8px #f1d28a99':'none'};transition:.15s"></span>`).join('')}</div>`:''}
   </div>`;
   return `<article class="card" id="product-${p.id}"><div class="card-grid">${imageBlock}<div class="content"><div class="content-head"><span class="tag">${esc(p.category||'Création')}</span><button type="button" class="share-btn" onclick="shareProduct(${p.id})">🔗 Partager</button></div><h2>${esc(p.name)}</h2><p class="desc">${esc(p.description||'Une création en préparation chez Emerald Forge 3D.')}</p><div class="specs"><div class="spec">📏 ${p.width||'—'} × ${p.height||'—'} × ${p.depth||'—'} cm</div><div class="spec">⚖️ ${p.weight||'—'} g</div><div class="spec">🖨️ ${p.print_hours||'—'} h d'impression</div><div class="spec">🧵 ${esc(p.material||'PLA')}</div><div class="spec spec-custom">🎨 Couleur &amp; taille personnalisables</div></div>${priceBlock}<div class="question">Vous l'achèteriez principalement pour…</div><div class="uses">${['Pour moi','Pour offrir','Cosplay','Collection','Décoration','Autre'].map(x=>`<label><input type="checkbox" name="use-${p.id}" value="${x}"><span>${x}</span></label>`).join('')}</div><input class="other" id="other-${p.id}" placeholder="Une autre idée ? (facultatif)"><div class="question">Intérêt pour cet objet <small>— votre ressenti</small></div><div class="range-row"><input type="range" min="1" max="5" value="3" oninput="document.getElementById('val-${p.id}').textContent=this.value" id="interest-${p.id}"><span class="range-value"><span id="val-${p.id}">3</span>/5</span></div><button class="submit" onclick="sendResponse(${p.id},this)">Valider mon avis</button></div></div></article>`
 }
-function galNav(id,dir){
+let galTimers={};
+function startAutoplay(id){
+  if(galTimers[id])return;
+  galTimers[id]=setInterval(()=>galNav(id,1,true),3500);
+}
+function stopAutoplay(id){
+  if(galTimers[id]){clearInterval(galTimers[id]);delete galTimers[id];}
+}
+function galTouchStart(e){
+  e.currentTarget.dataset.touchX=(e.touches&&e.touches[0])?e.touches[0].clientX:0;
+}
+function galTouchEnd(id,e){
+  const wrap=e.currentTarget;
+  const startX=Number(wrap.dataset.touchX||0);
+  const endX=(e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:startX;
+  const diff=endX-startX;
+  if(Math.abs(diff)>40)galNav(id,diff<0?1:-1,false);
+}
+function galNav(id,dir,auto=false){
   const wrap=document.querySelector(`#product-${id} .image-wrap`);
   if(!wrap)return;
   const gallery=(wrap.dataset.gallery||'').split('|').filter(Boolean);
   if(gallery.length<2)return;
+  if(!auto)stopAutoplay(id);
   let idx=(Number(wrap.dataset.idx)||0)+dir;
   if(idx<0)idx=gallery.length-1;
   if(idx>=gallery.length)idx=0;
@@ -115,14 +138,38 @@ async function checkAdmin(){const r=await fetch('/api/me');const x=await r.json(
 async function login(){const password=$('#password').value;$('#loginError').textContent='';const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});if(r.ok){$('#password').value='';checkAdmin()}else $('#loginError').textContent='Mot de passe incorrect.'}
 async function logout(){await fetch('/api/logout',{method:'POST'});checkAdmin()}
 function showTab(t){$('#fiches').classList.toggle('hidden',t!=='fiches');$('#stats').classList.toggle('hidden',t!=='stats');$('#tabFiches').classList.toggle('active',t==='fiches');$('#tabStats').classList.toggle('active',t==='stats');if(t==='stats')loadStats()}
-async function loadAdmin(){
-  const r=await fetch('/api/admin/products');if(!r.ok)return;const ps=await r.json();
-  const qrUrl=location.origin+location.pathname;
-  const qrImg=`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl)}`;
-  $('#fiches').innerHTML=`<div class="admin-card qr-card"><h3>QR code de l'enquête</h3><img src="${qrImg}" alt="QR code de l'enquête" width="220" height="220" style="display:block;margin:8px 0;border-radius:8px"><p style="font-size:.85em;word-break:break-all">${esc(qrUrl)}</p><a class="gold-button" style="width:auto;display:inline-block;text-decoration:none" href="${qrImg}" target="_blank" rel="noopener">⬇ Ouvrir / télécharger le QR code</a></div><button class="gold-button" style="width:auto;margin:14px 0 10px" onclick="newForm()">＋ Nouvelle fiche</button><div id="forms"></div>${ps.map(p=>adminCard(p)).join('')}`
-}
+async function loadAdmin(){const r=await fetch('/api/admin/products');if(!r.ok)return;const ps=await r.json();$('#fiches').innerHTML=`<button class="gold-button" style="width:auto;margin:0 0 10px" onclick="newForm()">＋ Nouvelle fiche</button><div id="forms"></div>${ps.map(p=>adminCard(p)).join('')}`}
 function adminCard(p){return `<div class="admin-card"><div class="row-actions"><strong>${esc(p.name)}</strong><span>${p.active?'🟢 active':'⚪ masqué'}</span><button onclick="editForm(${p.id})">Modifier</button><button onclick="deleteProduct(${p.id})">Supprimer</button></div></div>`}
-function formHtml(p={}){return `<div class="admin-card" id="form-${p.id||'new'}"><h3>${p.id?'Modifier':'Nouvelle'} fiche</h3><div class="formgrid"><label>Nom<input id="f-name" value="${esc(p.name||'')}"></label><label>Catégorie<input id="f-category" value="${esc(p.category||'Fantasy')}"></label><label style="grid-column:1/-1">Description<textarea id="f-description">${esc(p.description||'')}</textarea></label><label style="grid-column:1/-1">Photos <small>(5 max)</small><div id="imgPreviews" style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0"></div><input id="f-image-files" type="file" accept="image/*" multiple onchange="onNewFilesSelected(event)"></label><label>Largeur cm<input id="f-width" type="number" step="0.1" value="${p.width??''}"></label><label>Hauteur cm<input id="f-height" type="number" step="0.1" value="${p.height??''}"></label><label>Profondeur cm<input id="f-depth" type="number" step="0.1" value="${p.depth??''}"></label><label>Poids g<input id="f-weight" type="number" step="1" value="${p.weight??''}"></label><label>Temps d'impression h<input id="f-hours" type="number" step="0.1" value="${p.print_hours??''}"></label><label>Matière<input id="f-material" value="${esc(p.material||'PLA')}"></label><label>Prix mini (€)<input id="f-p-min" type="number" step="0.01" value="${p.price1??''}"></label><label>Prix maxi (€)<input id="f-p-max" type="number" step="0.01" value="${p.price2??''}"></label><label>Ordre<input id="f-order" type="number" value="${p.sort_order??0}"></label><label>Visible<select id="f-active"><option value="1" ${p.active!==0?'selected':''}>Oui</option><option value="0" ${p.active===0?'selected':''}>Non</option></select></label></div><button class="gold-button" style="width:auto" onclick="saveForm(${p.id||'null'})">Enregistrer</button> <button onclick="loadAdmin()">Annuler</button></div>`}
+function formHtml(p={}){return `<div class="admin-card" id="form-${p.id||'new'}"><h3>${p.id?'Modifier':'Nouvelle'} fiche</h3><div class="formgrid"><label>Nom<input id="f-name" value="${esc(p.name||'')}"></label><label>Catégorie<input id="f-category" value="${esc(p.category||'Fantasy')}"></label><label style="grid-column:1/-1">Description<textarea id="f-description">${esc(p.description||'')}</textarea></label><label style="grid-column:1/-1">Photos <small>(5 max)</small><div id="imgPreviews" style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0"></div><input id="f-image-files" type="file" accept="image/*" multiple onchange="onNewFilesSelected(event)"><button type="button" id="aiGenBtn" onclick="generateWithAI()" style="margin-top:8px;padding:9px 14px;border-radius:9px;border:1px solid #a67a2c;background:transparent;color:#f1d28a;cursor:pointer;font-weight:700">✨ Générer avec l'IA (nom, description, catégorie)</button></label><label>Largeur cm<input id="f-width" type="number" step="0.1" value="${p.width??''}"></label><label>Hauteur cm<input id="f-height" type="number" step="0.1" value="${p.height??''}"></label><label>Profondeur cm<input id="f-depth" type="number" step="0.1" value="${p.depth??''}"></label><label>Poids g<input id="f-weight" type="number" step="1" value="${p.weight??''}"></label><label>Temps d'impression h<input id="f-hours" type="number" step="0.1" value="${p.print_hours??''}"></label><label>Matière<input id="f-material" value="${esc(p.material||'PLA')}"></label><label>Prix mini (€)<input id="f-p-min" type="number" step="0.01" value="${p.price1??''}"></label><label>Prix maxi (€)<input id="f-p-max" type="number" step="0.01" value="${p.price2??''}"></label><label>Ordre<input id="f-order" type="number" value="${p.sort_order??0}"></label><label>Visible<select id="f-active"><option value="1" ${p.active!==0?'selected':''}>Oui</option><option value="0" ${p.active===0?'selected':''}>Non</option></select></label></div><button class="gold-button" style="width:auto" onclick="saveForm(${p.id||'null'})">Enregistrer</button> <button onclick="loadAdmin()">Annuler</button></div>`}
+async function generateWithAI(){
+  let file=formNewFiles[0];
+  let blob=file;
+  if(!blob&&formImages[0]){
+    try{const r=await fetch(formImages[0]);blob=await r.blob();}catch(e){}
+  }
+  if(!blob){
+    alert('Ajoutez d’abord une photo avant de générer avec l’IA.');
+    return;
+  }
+  const btn=$('#aiGenBtn');
+  const prevText=btn.textContent;
+  btn.disabled=true;btn.textContent='Génération…';
+  try{
+    const fd=new FormData();
+    fd.append('image',blob,file?file.name:'photo.jpg');
+    const r=await fetch('/api/admin/generate',{method:'POST',body:fd});
+    if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err.error||'Erreur IA');}
+    const data=await r.json();
+    if(data.name)$('#f-name').value=data.name;
+    if(data.category)$('#f-category').value=data.category;
+    if(data.description)$('#f-description').value=data.description;
+    if(data.material)$('#f-material').value=data.material;
+  }catch(e){
+    alert('Génération IA impossible : '+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent=prevText;
+  }
+}
 function newForm(){formImages=[];formNewFiles=[];$('#forms').innerHTML=formHtml();renderImagePreviews()}
 async function editForm(id){const r=await fetch('/api/admin/products');const ps=await r.json();const p=ps.find(x=>x.id===id);formImages=Array.isArray(p.images)&&p.images.length?[...p.images]:(p.image?[p.image]:[]);formNewFiles=[];$('#forms').innerHTML=formHtml(p);renderImagePreviews();document.querySelector('#forms').scrollIntoView({behavior:'smooth',block:'start'})}
 async function saveForm(id){
