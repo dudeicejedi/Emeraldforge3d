@@ -199,14 +199,14 @@ async function sendResponse(id,btn){
   const uses=[...document.querySelectorAll(`input[name="use-${id}"]:checked`)].map(x=>x.value);const interest=$(`#interest-${id}`).value;let other=$(`#other-${id}`).value.trim();
   const lowintEl=$(`#lowintText-${id}`);
   const lowint=lowintEl?lowintEl.value.trim():'';
-  if(lowint)other=(other?other+' | ':'')+'[Intérêt 1/5] '+lowint;
+  if(lowint)other=(other?other+' | ':'')+`[Intérêt ${interest}/5] `+lowint;
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{const r=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,price_choice:priceValue,uses,interest,other})});if(!r.ok)throw new Error();answered.add(id);markVoted(id);btn.textContent='✓ Réponse enregistrée';btn.scrollIntoView({behavior:'smooth',block:'center'});updateProgress();}
   catch(e){btn.disabled=false;btn.textContent='Réessayer';alert('Votre réponse n’a pas pu être enregistrée.');}
 }
 function toggleLowInterest(id,val){
   const box=$(`#lowint-${id}`);
-  if(box)box.classList.toggle('hidden',Number(val)!==1);
+  if(box)box.classList.toggle('hidden',Number(val)>2);
 }
 function updateProgress(){const n=answered.size;$('#progressText').textContent=`${n}/${productCount} création${productCount>1?'s':''} évaluée${productCount>1?'s':''}`}
 let formImages=[], formNewFiles=[];
