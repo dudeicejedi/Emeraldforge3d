@@ -174,11 +174,17 @@ async function loadStats(){
 function injectGlobalQR(){
   if($('.global-qr'))return;
   const qrUrl=location.origin+location.pathname;
-  const qrImg=`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrUrl)}`;
+  const qrImg=`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrUrl)}`;
   const box=document.createElement('div');
   box.className='global-qr';
-  box.style.cssText='text-align:center;margin:18px auto;padding:16px;max-width:240px;border:1px solid rgba(255,255,255,.15);border-radius:12px;background:rgba(255,255,255,.03)';
-  box.innerHTML=`<p style="margin:0 0 8px;font-size:.85em;opacity:.85">Faites tourner l'enquête — scannez et partagez</p><img src="${qrImg}" alt="QR code de l'enquête Emerald Forge 3D" width="180" height="180" style="border-radius:8px;display:block;margin:0 auto"><p style="margin:8px 0 0;font-size:.75em;opacity:.6;word-break:break-all">${esc(qrUrl)}</p>`;
+  box.style.cssText='text-align:center;margin:22px auto 30px;max-width:260px';
+  box.innerHTML=`<div style="border:1px solid #2d4935;border-radius:18px;padding:20px;background:linear-gradient(145deg,rgba(19,29,22,.98),rgba(6,10,7,.98));box-shadow:0 18px 50px #000b">
+    <p style="margin:0 0 12px;font-family:Cinzel,Georgia,serif;color:#f1d28a;font-size:1rem;letter-spacing:.03em">Faites tourner l'enquête</p>
+    <div style="background:#fff;padding:10px;border-radius:11px;display:inline-block;box-shadow:0 0 20px #00ff6626">
+      <img src="${qrImg}" alt="QR code de l'enquête Emerald Forge 3D" width="160" height="160" style="display:block;border-radius:4px">
+    </div>
+    <p style="margin:12px 0 0;font-size:.7rem;color:#87968b;word-break:break-all">${esc(qrUrl)}</p>
+  </div>`;
   const anchor=$('#products');
   if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(box,anchor);
 }
